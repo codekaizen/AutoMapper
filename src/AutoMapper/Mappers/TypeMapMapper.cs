@@ -17,9 +17,10 @@ namespace AutoMapper.Mappers
 	        context.TypeMap.Seal();
 
 	        var mapperToUse = _mappers.First(objectMapper => objectMapper.IsMatch(context, mapper));
-            object mappedObject = mapperToUse.Map(context, mapper);
 
-            context.TypeMap.AfterMap(context.SourceValue, mappedObject);
+	        // check whether the context passes conditions before attempting to map the value (depth check)
+            object mappedObject = !context.TypeMap.ShouldAssignValue(context) ? null : mapperToUse.Map(context, mapper);
+
 	        return mappedObject;
 		}
 

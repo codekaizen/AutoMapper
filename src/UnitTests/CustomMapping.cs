@@ -1,5 +1,5 @@
 using System;
-using NBehave.Spec.NUnit;
+using Should;
 using NUnit.Framework;
 
 namespace AutoMapper.UnitTests
@@ -16,6 +16,7 @@ namespace AutoMapper.UnitTests
 				public int Value2fff { get; set; }
 				public int Value3 { get; set; }
 				public int Value4 { get; set; }
+				public int Value5 { get; set; }
 			}
 
 			public class ModelDto
@@ -24,6 +25,7 @@ namespace AutoMapper.UnitTests
 				public int Value2 { get; set; }
 				public int Value3 { get; set; }
 				public int Value4 { get; set; }
+				public int Value5 { get; set; }
 			}
 
 			public class CustomResolver : IValueResolver
@@ -60,9 +62,10 @@ namespace AutoMapper.UnitTests
 				Mapper.CreateMap<ModelObject, ModelDto>()
 					.ForMember(dto => dto.Value, opt => opt.ResolveUsing<CustomResolver>())
 					.ForMember(dto => dto.Value2, opt => opt.ResolveUsing(new CustomResolver2()))
-					.ForMember(dto => dto.Value4, opt => opt.ResolveUsing(typeof(CustomResolver3)));
+					.ForMember(dto => dto.Value4, opt => opt.ResolveUsing(typeof(CustomResolver3)))
+					.ForMember(dto => dto.Value5, opt => opt.ResolveUsing(src => src.Value5 + 5));
 
-				var model = new ModelObject { Value = 42, Value2fff = 42, Value3 = 42, Value4 = 42 };
+				var model = new ModelObject { Value = 42, Value2fff = 42, Value3 = 42, Value4 = 42, Value5 = 42 };
 				_result = Mapper.Map<ModelObject, ModelDto>(model);
 			}
 
@@ -88,6 +91,12 @@ namespace AutoMapper.UnitTests
 			public void Should_use_the_type_object_based_mapping_for_custom_dto_members()
 			{
 				_result.Value4.ShouldEqual(46);
+			}
+
+			[Test]
+			public void Should_use_the_func_based_mapping_for_custom_dto_members()
+			{
+				_result.Value5.ShouldEqual(47);
 			}
 		}
 
@@ -651,6 +660,48 @@ namespace AutoMapper.UnitTests
 			}
 		}
 
+
+        public class When_custom_resolver_requests_property_to_be_ignored : AutoMapperSpecBase
+        {
+            private Destination _result = new Destination() { Value = 55 };
+
+            public class Source
+            {
+                public int Value { get; set; }
+            }
+
+            public class Destination
+            {
+                public int Value { get; set; }
+            }
+
+            public class CustomValueResolver : IValueResolver
+            {
+                public ResolutionResult Resolve(ResolutionResult source)
+                {
+                    return source.Ignore();
+                }
+            }
+
+            protected override void Establish_context()
+            {
+                Mapper.CreateMap<Source, Destination>()
+                    .ForMember(d => d.Value, opt => opt.ResolveUsing<CustomValueResolver>().FromMember(src => src.Value));
+            }
+
+            protected override void Because_of()
+            {
+                _result = Mapper.Map(new Source { Value = 5 }, _result);
+            }
+
+            [Test]
+            public void Should_not_overwrite_destination_value()
+            {
+                _result.Value.ShouldEqual(55);
+            }
+        }
+
+
 		public class When_specifying_member_and_member_resolver_using_string_property_names : AutoMapperSpecBase
 		{
 			private Destination _result;
@@ -910,6 +961,45 @@ namespace AutoMapper.UnitTests
 				_dest.Value.ShouldEqual(5);
 			}
 		}
+
+        public class When_building_custom_configuration_mapping_to_itself : NonValidatingSpecBase
+        {
+            private Exception _e;
+
+            public class Source
+            {
+
+            }
+
+            public class Dest
+            {
+                public int Value { get; set; }
+            }
+
+            protected override void Establish_context()
+            {
+            }
+
+            protected override void Because_of()
+            {
+                try
+                {
+                    Mapper.CreateMap<Source, Dest>()
+                        .ForMember(dest => dest, opt => opt.UseValue(5));
+                }
+                catch (Exception e)
+                {
+                    _e = e;
+                }
+            }
+
+            [Test]
+            public void Should_map_from_that_constant_value()
+            {
+                _e.ShouldNotBeNull();
+            }
+        }
+
 
 	}
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace AutoMapper
 {
@@ -10,17 +11,24 @@ namespace AutoMapper
         private readonly IList<Action<object, object>> _beforeMapActions = new List<Action<object, object>>();
         private readonly TypeInfo _destinationType;
         private readonly IDictionary<Type, Type> _includedDerivedTypes = new Dictionary<Type, Type>();
-        private readonly IList<PropertyMap> _propertyMaps = new List<PropertyMap>();
+		private readonly ThreadSafeList<PropertyMap> _propertyMaps = new ThreadSafeList<PropertyMap>();
         private readonly IList<PropertyMap> _inheritedMaps = new List<PropertyMap>();
         private PropertyMap[] _orderedPropertyMaps;
         private readonly TypeInfo _sourceType;
         private bool _sealed;
+        private Func<ResolutionContext, bool> _condition;
+        private ConstructorMap _constructorMap;
 
         public TypeMap(TypeInfo sourceType, TypeInfo destinationType)
         {
             _sourceType = sourceType;
             _destinationType = destinationType;
             Profile = ConfigurationStore.DefaultProfileName;
+        }
+
+        public ConstructorMap ConstructorMap
+        {
+            get { return _constructorMap; }
         }
 
         public Type SourceType
@@ -63,6 +71,10 @@ namespace AutoMapper
         public Func<object, object> DestinationCtor { get; set; }
 
         public List<string> IgnorePropertiesStartingWith { get; set; }
+
+        public Type DestinationTypeOverride { get; set; }
+
+        public bool ConstructDestinationUsingServiceLocator { get; set; }
 
         public IEnumerable<PropertyMap> GetPropertyMaps()
         {
@@ -224,6 +236,22 @@ namespace AutoMapper
             {
                 _includedDerivedTypes.Add(includedDerivedType);
             }
+        }
+
+        public void SetCondition(Func<ResolutionContext, bool> condition)
+        {
+            _condition = condition;
+        }
+
+        public bool ShouldAssignValue(ResolutionContext resolutionContext)
+        {
+            return _condition == null || _condition(resolutionContext);
+        }
+
+        public void AddConstructorMap(ConstructorInfo constructorInfo, IEnumerable<ConstructorParameterMap> parameters)
+        {
+            var ctorMap = new ConstructorMap(constructorInfo, parameters);
+            _constructorMap = ctorMap;
         }
     }
 }

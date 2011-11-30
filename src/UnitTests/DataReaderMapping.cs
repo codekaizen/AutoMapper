@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.SyntaxHelpers;
+using Should;
 
 namespace AutoMapper.UnitTests
 {
@@ -87,9 +88,41 @@ namespace AutoMapper.UnitTests
             }
 
 
-            private DTOObject _result;
+            protected DTOObject _result;
+            protected IDataReader _dataReader;
+        }
+
+        /// <summary>
+        /// The purpose of this test is to exercise the internal caching logic of DataReaderMapper.
+        /// </summary>
+        public class When_mapping_a_data_reader_to_a_dto_twice : When_mapping_a_data_reader_to_a_dto
+        {
+            protected override void Establish_context()
+            {
+                base.Establish_context();
+
+                _dataReader = new DataBuilder().BuildDataReader();
+                _result = Mapper.Map<IDataReader, IEnumerable<DTOObject>>(_dataReader).FirstOrDefault();
+            }
+        }
+
+        public class When_mapping_a_data_reader_to_a_dto_and_the_map_does_not_exist : AutoMapperSpecBase
+        {
+            protected override void Establish_context()
+            {
+                _dataReader = new DataBuilder().BuildDataReader();
+            }
+
+            [Test]
+            public void Then_an_automapper_exception_should_be_thrown()
+            {
+                typeof (AutoMapperMappingException).ShouldBeThrownBy(
+                    () => Mapper.Map<IDataReader, IEnumerable<DTOObject>>(_dataReader).FirstOrDefault());
+            }
+
             private IDataReader _dataReader;
         }
+
 
         public class When_mapping_a_single_data_record_to_a_dto : AutoMapperSpecBase
         {
@@ -231,6 +264,79 @@ namespace AutoMapper.UnitTests
 
             private IDataReader _dataReader;
         }
+
+		public class When_mapping_a_data_reader_to_a_dto_with_nullable_enum : AutoMapperSpecBase
+		{
+			internal const string FieldName = "Value";
+			internal const int FieldValue = 3;
+
+			public enum settlement_type
+			{
+				PreDelivery = 0,
+				DVP = 1,
+				FreeDelivery = 2,
+				Prepayment = 3,
+				Allocation = 4,
+				SafeSettlement = 5,
+			}
+			internal class DtoWithSingleNullableField
+			{
+				public settlement_type? Value { get; set; }
+			}
+
+			internal class DataBuilder
+			{
+				public IDataReader BuildDataReaderWithNullableField()
+				{
+					var table = new DataTable();
+
+					var col = table.Columns.Add(FieldName, typeof(int));
+					col.AllowDBNull = true;
+
+					var row1 = table.NewRow();
+					row1[FieldName] = FieldValue;
+					table.Rows.Add(row1);
+
+					var row2 = table.NewRow();
+					row2[FieldName] = DBNull.Value;
+					table.Rows.Add(row2);
+
+					return table.CreateDataReader();
+				}
+			}
+
+			protected override void Establish_context()
+			{
+				Mapper.CreateMap<IDataReader, DtoWithSingleNullableField>();
+
+				_dataReader = new DataBuilder().BuildDataReaderWithNullableField();
+			}
+
+			[Test]
+			public void Then_results_should_be_as_expected()
+			{
+				while (_dataReader.Read())
+				{
+					//var dto = Mapper.Map<IDataReader, DtoWithSingleNullableField>(_dataReader);
+					var dto = new DtoWithSingleNullableField();
+
+					object value = _dataReader[0];
+					if (!Equals(value, DBNull.Value))
+						dto.Value = (settlement_type)value;
+
+					if (_dataReader.IsDBNull(0))
+						dto.Value.HasValue.ShouldBeFalse();
+					else
+					{
+						dto.Value.HasValue.ShouldBeTrue();
+
+						dto.Value.Value.ShouldEqual(settlement_type.Prepayment);
+					}
+				}
+			}
+
+			private IDataReader _dataReader;
+		}
 
         internal class FieldName
         {

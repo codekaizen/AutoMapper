@@ -1,24 +1,24 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using NBehave.Spec.NUnit;
+using Should;
 
 namespace AutoMapper.UnitTests.Bug
 {
 	namespace AssignableCollectionBug
 	{
-		interface IAddress
+		public interface IAddress
 		{
 			string Street { get; set; }
 		}
 
-		interface IPerson
+        public interface IPerson
 		{
 			string Name { get; set; }
 			IList<IAddress> Addresses { get; set; }
 		}
 
 		// To keep things as simple as possible, implementations are exactly the same.
-		class PersonOne : IPerson
+        public class PersonOne : IPerson
 		{
 			#region Implementation of IPerson
 
@@ -28,13 +28,13 @@ namespace AutoMapper.UnitTests.Bug
 			#endregion
 		}
 
-		class PersonTwo : IPerson
+        public class PersonTwo : IPerson
 		{
 			public string Name { get; set; }
 			public IList<IAddress> Addresses { get; set; }
 		}
 
-		class AddressOne : IAddress
+        public class AddressOne : IAddress
 		{
 			#region Implementation of IAddress
 
@@ -43,7 +43,7 @@ namespace AutoMapper.UnitTests.Bug
 			#endregion
 		}
 
-		class AddressTwo : IAddress
+        public class AddressTwo : IAddress
 		{
 			#region Implementation of IAddress
 
@@ -75,7 +75,7 @@ namespace AutoMapper.UnitTests.Bug
 				Assert.AreEqual(source.Addresses[0].Street, result.Addresses[0].Street);
 
 				// This is what I can't get to pass:
-				result.Addresses[0].ShouldBeInstanceOf<AddressTwo>();
+				result.Addresses[0].ShouldBeType<AddressTwo>();
 
 				// Expected: instance of <AutomapperTest.AddressTwo>
 				// But was:  <AutomapperTest.AddressOne>

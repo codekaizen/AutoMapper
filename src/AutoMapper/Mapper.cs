@@ -1,20 +1,36 @@
 using System;
+using System.Linq.Expressions;
 using AutoMapper.Mappers;
 
 namespace AutoMapper
 {
-	public static class Mapper
+    public static class Mapper
 	{
-        private static object _configurationSync = new object();
-        private static object _engineSync = new object();
-        private static ConfigurationStore _configuration;
-		private static IMappingEngine _mappingEngine;
+	    private static readonly Func<ConfigurationStore> _configurationInit =
+	        () => new ConfigurationStore(new TypeMapFactory(), MapperRegistry.AllMappers());
+        
+        private static Lazy<ConfigurationStore> _configuration = new Lazy<ConfigurationStore>(_configurationInit);
+
+        private static readonly Func<IMappingEngine> _mappingEngineInit = 
+            () => new MappingEngine(_configuration.Value);
+
+		private static Lazy<IMappingEngine> _mappingEngine = new Lazy<IMappingEngine>(_mappingEngineInit);
 
 		public static bool AllowNullDestinationValues
 		{
 			get { return Configuration.AllowNullDestinationValues; }
 			set { Configuration.AllowNullDestinationValues = value; }
 		}
+
+        public static TDestination Map<TDestination>(object source)
+        {
+            return Engine.Map<TDestination>(source);
+        }
+
+        public static TDestination Map<TDestination>(object source, Action<IMappingOperationOptions> opts)
+        {
+            return Engine.Map<TDestination>(source, opts);
+        }
 
 		public static TDestination Map<TSource, TDestination>(TSource source)
 		{
@@ -26,14 +42,39 @@ namespace AutoMapper
 			return Engine.Map(source, destination);
 		}
 
+        public static TDestination Map<TSource, TDestination>(TSource source, TDestination destination, Action<IMappingOperationOptions> opts)
+        {
+            return Engine.Map(source, destination, opts);
+        }
+
+		public static TDestination Map<TSource, TDestination>(TSource source, Action<IMappingOperationOptions> opts)
+		{
+            return Engine.Map<TSource, TDestination>(source, opts);
+		}
+
 		public static object Map(object source, Type sourceType, Type destinationType)
 		{
 			return Engine.Map(source, sourceType, destinationType);
 		}
 
+        public static object Map(object source, Type sourceType, Type destinationType, Action<IMappingOperationOptions> opts)
+        {
+            return Engine.Map(source, sourceType, destinationType, opts);
+        }
+
 		public static object Map(object source, object destination, Type sourceType, Type destinationType)
 		{
 			return Engine.Map(source, destination, sourceType, destinationType);
+		}
+
+        public static object Map(object source, object destination, Type sourceType, Type destinationType, Action<IMappingOperationOptions> opts)
+        {
+            return Engine.Map(source, destination, sourceType, destinationType, opts);
+        }
+
+        public static Expression<Func<TSource, TDestination>> CreateMapExpression<TSource, TDestination>()
+		{
+            return Engine.CreateMapExpression<TSource, TDestination>();
 		}
 
 		public static TDestination DynamicMap<TSource, TDestination>(TSource source)
@@ -157,30 +198,15 @@ namespace AutoMapper
 
 		public static void Reset()
 		{
-			lock (_configurationSync)
-				lock (_engineSync)
-				{
-					_configuration = null;
-					_mappingEngine = null;
-				}
+			_configuration = new Lazy<ConfigurationStore>(_configurationInit);
+			_mappingEngine = new Lazy<IMappingEngine>(_mappingEngineInit);
 		}
 
 		public static IMappingEngine Engine
 		{
 			get
 			{
-				if (_mappingEngine == null)
-				{
-                    lock (_engineSync)
-					{
-						if (_mappingEngine == null)
-						{
-							_mappingEngine = new MappingEngine(ConfigurationProvider);
-						}
-					}
-				}
-
-				return _mappingEngine;
+			    return _mappingEngine.Value;
 			}
 		}
 
@@ -193,18 +219,7 @@ namespace AutoMapper
 		{
 			get
 			{
-				if (_configuration == null)
-				{
-                    lock (_configurationSync)
-					{
-						if (_configuration == null)
-						{
-                            _configuration = new ConfigurationStore(new TypeMapFactory(), MapperRegistry.AllMappers());
-						}
-					}
-				}
-
-				return _configuration;
+			    return _configuration.Value;
 			}
 		}
 

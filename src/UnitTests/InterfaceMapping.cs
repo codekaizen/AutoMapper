@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using NBehave.Spec.NUnit;
+using System.Linq;
+using Should;
 using NUnit.Framework;
 
 namespace AutoMapper.UnitTests
@@ -65,7 +66,7 @@ namespace AutoMapper.UnitTests
             [Test]
             public void Should_map_Child_to_SubDtoChildObject_type()
             {
-                _result.Child.ShouldBeInstanceOfType(typeof (SubDtoChildObject));
+                _result.Child.ShouldBeType(typeof (SubDtoChildObject));
             }
 
             [Test]
@@ -147,7 +148,8 @@ namespace AutoMapper.UnitTests
             [Test]
             public void Should_derive_from_INotifyPropertyChanged()
             {
-                _result.ShouldBeInstanceOf<INotifyPropertyChanged>();    
+                var q = _result as INotifyPropertyChanged;
+                q.ShouldNotBeNull();
             }
 
             [Test]
@@ -156,7 +158,7 @@ namespace AutoMapper.UnitTests
                 var count = 0;
                 _result.PropertyChanged += (o, e) => {
                     count++;
-                    o.ShouldBeTheSameAs(_result); 
+                    o.ShouldBeSameAs(_result); 
                     e.PropertyName.ShouldEqual("Value");
                 };
 
@@ -356,6 +358,40 @@ namespace AutoMapper.UnitTests
             {
                 Mapper.AssertConfigurationIsValid();
             }
+        }
+
+        public class MappingToInterfacesWithPolymorphism : AutoMapperSpecBase
+        {
+            private BaseDto[] _baseDtos;
+
+            public interface IBase { }
+            public interface IDerived : IBase { }
+            public class Base : IBase { }
+            public class Derived : Base, IDerived { }
+            public class BaseDto { }
+            public class DerivedDto : BaseDto { }
+
+            //and following mappings:
+            protected override void Establish_context()
+            {
+                Mapper.CreateMap<Base, BaseDto>().Include<Derived, DerivedDto>();
+                Mapper.CreateMap<Derived, DerivedDto>();
+                // try with and without the following two lines, also try with just the following two lines
+                Mapper.CreateMap<IBase, BaseDto>().Include<IDerived, DerivedDto>();
+                Mapper.CreateMap<IDerived, DerivedDto>();
+            }
+            protected override void Because_of()
+            {
+                List<Base> list = new List<Base>() { new Derived() };
+                _baseDtos = Mapper.Map<IEnumerable<Base>, BaseDto[]>(list);
+            }
+
+            [Test]
+            public void Should_use_the_derived_type_map()
+            {
+                _baseDtos.First().ShouldBeType<DerivedDto>();
+            }
+
         }
 
         [TestFixture, Explicit]

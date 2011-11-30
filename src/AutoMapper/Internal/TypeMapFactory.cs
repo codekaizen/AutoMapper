@@ -1,16 +1,20 @@
 using System;
+#if !SILVERLIGHT
+using System.Collections.Concurrent;
+#else
+using TvdP.Collections;
+#endif
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using AutoMapper.Internal;
 
 namespace AutoMapper
 {
     public class TypeMapFactory : ITypeMapFactory
     {
-        private static readonly IDictionary<Type, TypeInfo> _typeInfos = new Dictionary<Type, TypeInfo>();
-        private readonly object _typeInfoSync = new object();
+        private static readonly ConcurrentDictionary<Type, TypeInfo> _typeInfos =
+            new ConcurrentDictionary<Type, TypeInfo>();
 
         public TypeMap CreateTypeMap(Type sourceType, Type destinationType, IMappingOptions options)
         {
@@ -25,34 +29,61 @@ namespace AutoMapper
 
                 if (MapDestinationPropertyToSource(members, sourceTypeInfo, destProperty.Name, options))
                 {
-                    var resolvers = members.Select(mi => mi.ToMemberGetter()).Cast<IValueResolver>();
+                    var resolvers = members.Select(mi => mi.ToMemberGetter());
                     var destPropertyAccessor = destProperty.ToMemberAccessor();
+#if !SILVERLIGHT
                     typeMap.AddPropertyMap(destPropertyAccessor, resolvers);
+#else
+                    typeMap.AddPropertyMap(destPropertyAccessor, resolvers.Cast<IValueResolver>());
+#endif
+                }
+            }
+            if (!destinationType.IsAbstract && destinationType.IsClass)
+            {
+                foreach (var destCtor in destTypeInfo.GetConstructors().OrderByDescending(ci => ci.GetParameters().Length))
+                {
+                    if (MapDestinationCtorToSource(typeMap, destCtor, sourceTypeInfo, options))
+                    {
+                        break;
+                    }
                 }
             }
             return typeMap;
         }
 
-        private TypeInfo GetTypeInfo(Type type)
+        private bool MapDestinationCtorToSource(TypeMap typeMap, ConstructorInfo destCtor, TypeInfo sourceTypeInfo,
+                                                IMappingOptions options)
         {
-            TypeInfo typeInfo;
+            var parameters = new List<ConstructorParameterMap>();
 
-            if (!_typeInfos.TryGetValue(type, out typeInfo))
+            foreach (var parameter in destCtor.GetParameters())
             {
-                lock (_typeInfoSync)
-                {
-                    if (!_typeInfos.TryGetValue(type, out typeInfo))
-                    {
-                        typeInfo = new TypeInfo(type);
-                        _typeInfos.Add(type, typeInfo);
-                    }
-                }
+                var members = new LinkedList<MemberInfo>();
+
+                if (!MapDestinationPropertyToSource(members, sourceTypeInfo, parameter.Name, options))
+                    return false;
+
+                var resolvers = members.Select(mi => mi.ToMemberGetter());
+
+                var param = new ConstructorParameterMap(parameter, resolvers.ToArray());
+
+                parameters.Add(param);
             }
+
+            typeMap.AddConstructorMap(destCtor, parameters);
+
+            return true;
+        }
+
+        private static TypeInfo GetTypeInfo(Type type)
+        {
+            TypeInfo typeInfo = _typeInfos.GetOrAdd(type, t => new TypeInfo(type));
 
             return typeInfo;
         }
 
-        private bool MapDestinationPropertyToSource(LinkedList<MemberInfo> resolvers, TypeInfo sourceType, string nameToSearch, IMappingOptions mappingOptions)
+        private bool MapDestinationPropertyToSource(LinkedList<MemberInfo> resolvers, TypeInfo sourceType,
+                                                    string nameToSearch, IMappingOptions mappingOptions)
         {
             if (string.IsNullOrEmpty(nameToSearch))
                 return true;
@@ -60,46 +91,51 @@ namespace AutoMapper
             var sourceProperties = sourceType.GetPublicReadAccessors();
             var sourceNoArgMethods = sourceType.GetPublicNoArgMethods();
 
-			MemberInfo resolver = FindTypeMember(sourceProperties, sourceNoArgMethods, nameToSearch, mappingOptions);
+            MemberInfo resolver = FindTypeMember(sourceProperties, sourceNoArgMethods, nameToSearch, mappingOptions);
 
-			bool foundMatch = resolver != null;
+            bool foundMatch = resolver != null;
 
-        	if (foundMatch)
-        	{
-        		resolvers.AddLast(resolver);
-        	}
-        	else
-        	{
-        		string[] matches = mappingOptions.DestinationMemberNamingConvention.SplittingExpression
-        			.Matches(nameToSearch)
-        			.Cast<Match>()
-        			.Select(m => m.Value)
-        			.ToArray();
+            if (foundMatch)
+            {
+                resolvers.AddLast(resolver);
+            }
+            else
+            {
+                string[] matches = mappingOptions.DestinationMemberNamingConvention.SplittingExpression
+                    .Matches(nameToSearch)
+                    .Cast<Match>()
+                    .Select(m => m.Value)
+                    .ToArray();
 
-        		for (int i = 1; (i <= matches.Length) && (!foundMatch); i++)
-        		{
-        			NameSnippet snippet = CreateNameSnippet(matches, i, mappingOptions);
+                for (int i = 1; (i <= matches.Length) && (!foundMatch); i++)
+                {
+                    NameSnippet snippet = CreateNameSnippet(matches, i, mappingOptions);
 
-        			var valueResolver = FindTypeMember(sourceProperties, sourceNoArgMethods, snippet.First, mappingOptions);
+                    var valueResolver = FindTypeMember(sourceProperties, sourceNoArgMethods, snippet.First,
+                                                       mappingOptions);
 
-        			if (valueResolver != null)
-        			{
-        				resolvers.AddLast(valueResolver);
+                    if (valueResolver != null)
+                    {
+                        resolvers.AddLast(valueResolver);
 
-        				foundMatch = MapDestinationPropertyToSource(resolvers, GetTypeInfo(valueResolver.GetMemberType()), snippet.Second, mappingOptions);
+                        foundMatch = MapDestinationPropertyToSource(resolvers,
+                                                                    GetTypeInfo(valueResolver.GetMemberType()),
+                                                                    snippet.Second, mappingOptions);
 
-        				if (!foundMatch)
-        				{
-        					resolvers.RemoveLast();
-        				}
-        			}
-        		}
-        	}
+                        if (!foundMatch)
+                        {
+                            resolvers.RemoveLast();
+                        }
+                    }
+                }
+            }
 
-        	return foundMatch;
+            return foundMatch;
         }
 
-        private static MemberInfo FindTypeMember(IEnumerable<MemberInfo> modelProperties, IEnumerable<MethodInfo> getMethods, string nameToSearch, IMappingOptions mappingOptions)
+        private static MemberInfo FindTypeMember(IEnumerable<MemberInfo> modelProperties,
+                                                 IEnumerable<MethodInfo> getMethods, string nameToSearch,
+                                                 IMappingOptions mappingOptions)
         {
             MemberInfo pi = modelProperties.FirstOrDefault(prop => NameMatches(prop.Name, nameToSearch));
             if (pi != null)
@@ -109,19 +145,27 @@ namespace AutoMapper
             if (mi != null)
                 return mi;
 
-            pi = modelProperties.FirstOrDefault(prop => NameMatches(mappingOptions.SourceMemberNameTransformer(prop.Name), nameToSearch));
+            pi =
+                modelProperties.FirstOrDefault(
+                    prop => NameMatches(mappingOptions.SourceMemberNameTransformer(prop.Name), nameToSearch));
             if (pi != null)
                 return pi;
 
-            mi = getMethods.FirstOrDefault(m => NameMatches(mappingOptions.SourceMemberNameTransformer(m.Name), nameToSearch));
+            mi =
+                getMethods.FirstOrDefault(
+                    m => NameMatches(mappingOptions.SourceMemberNameTransformer(m.Name), nameToSearch));
             if (mi != null)
                 return mi;
 
-            pi = modelProperties.FirstOrDefault(prop => NameMatches(prop.Name, mappingOptions.DestinationMemberNameTransformer(nameToSearch)));
+            pi =
+                modelProperties.FirstOrDefault(
+                    prop => NameMatches(prop.Name, mappingOptions.DestinationMemberNameTransformer(nameToSearch)));
             if (pi != null)
                 return pi;
 
-            pi = getMethods.FirstOrDefault(m => NameMatches(m.Name, mappingOptions.DestinationMemberNameTransformer(nameToSearch)));
+            pi =
+                getMethods.FirstOrDefault(
+                    m => NameMatches(m.Name, mappingOptions.DestinationMemberNameTransformer(nameToSearch)));
             if (pi != null)
                 return pi;
 
@@ -136,10 +180,14 @@ namespace AutoMapper
         private NameSnippet CreateNameSnippet(IEnumerable<string> matches, int i, IMappingOptions mappingOptions)
         {
             return new NameSnippet
-                    {
-                        First = String.Join(mappingOptions.SourceMemberNamingConvention.SeparatorCharacter, matches.Take(i).ToArray()),
-                        Second = String.Join(mappingOptions.SourceMemberNamingConvention.SeparatorCharacter, matches.Skip(i).ToArray())
-                    };
+            {
+                First =
+                    String.Join(mappingOptions.SourceMemberNamingConvention.SeparatorCharacter,
+                                matches.Take(i).ToArray()),
+                Second =
+                    String.Join(mappingOptions.SourceMemberNamingConvention.SeparatorCharacter,
+                                matches.Skip(i).ToArray())
+            };
         }
 
         private class NameSnippet
@@ -147,5 +195,7 @@ namespace AutoMapper
             public string First { get; set; }
             public string Second { get; set; }
         }
+
     }
+
 }

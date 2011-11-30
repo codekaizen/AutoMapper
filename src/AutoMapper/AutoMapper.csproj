@@ -33,7 +33,7 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
-    <TargetFrameworkProfile />
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -44,6 +44,8 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>bin\Debug\AutoMapper.xml</DocumentationFile>
+    <NoWarn>1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -53,6 +55,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>bin\Release\AutoMapper.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'AutomatedDebug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -63,6 +66,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>..\..\build\Debug\AutoMapper\AutoMapper.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'AutomatedRelease|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -73,12 +77,9 @@
     <ErrorReport>prompt</ErrorReport>
     <Optimize>true</Optimize>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>..\..\build\Release\AutoMapper\AutoMapper.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Castle.Core, Version=1.2.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\lib\Castle.DynamicProxy-2.2\bin\net-35\Castle.Core.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -88,18 +89,20 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\CommonAssemblyInfo.cs">
-      <Link>CommonAssemblyInfo.cs</Link>
+      <Link>Properties\CommonAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AutoMapperMappingException.cs" />
     <Compile Include="Configuration\MapperConfiguration.cs" />
     <Compile Include="Configuration\MapperRegistry.cs" />
     <Compile Include="Configuration\TypeMapConfiguration.cs" />
+    <Compile Include="ConstructorMap.cs" />
+    <Compile Include="ConstructorParameterMap.cs" />
+    <Compile Include="IgnoreMapAttribute.cs" />
     <Compile Include="IMappingAction.cs" />
     <Compile Include="IMappingEngineRunner.cs" />
+    <Compile Include="IMappingOperationOptions.cs" />
     <Compile Include="INamingConvention.cs" />
-    <Compile Include="Internal\NotifyPropertyBehaviorInterceptor.cs" />
-    <Compile Include="Internal\PropertyBehaviorInterceptor.cs" />
     <Compile Include="Internal\DelegateBasedResolver2.cs" />
     <Compile Include="Internal\DeferredInstantiatedConverter.cs" />
     <Compile Include="Internal\DelegateFactory.cs" />
@@ -118,7 +121,6 @@
     <Compile Include="Internal\PropertyNameResolver.cs" />
     <Compile Include="Internal\TypePair.cs" />
     <Compile Include="IObjectMapper.cs" />
-    <Compile Include="ISelfProfiler.cs" />
     <Compile Include="AutoMapperConfigurationException.cs" />
     <Compile Include="ITypeConverter.cs" />
     <Compile Include="Mapper.cs" />
@@ -145,6 +147,7 @@
     <Compile Include="Mappers\MapperRegistry.cs" />
     <Compile Include="Mappers\NullableMapper.cs" />
     <Compile Include="Mappers\ObjectCreator.cs" />
+    <Compile Include="Mappers\ReadOnlyCollectionMapper.cs" />
     <Compile Include="Mappers\StringMapper.cs" />
     <Compile Include="Mappers\TypeConverterMapper.cs" />
     <Compile Include="Mappers\TypeHelper.cs" />
@@ -156,21 +159,24 @@
     <Compile Include="Internal\NullReplacementMethod.cs" />
     <Compile Include="Internal\PrimitiveExtensions.cs" />
     <Compile Include="Profile.cs" />
+    <Compile Include="Internal\PropertyEmitter.cs" />
     <Compile Include="PropertyMap.cs" />
     <Compile Include="Internal\ReflectionHelper.cs" />
+    <Compile Include="Internal\ProxyBase.cs" />
+    <Compile Include="Internal\ProxyGenerator.cs" />
+    <Compile Include="QueryableExtensions.cs" />
     <Compile Include="ResolutionContext.cs" />
     <Compile Include="Internal\ResolutionExpression.cs" />
     <Compile Include="ResolutionResult.cs" />
-    <Compile Include="SelfProfiler.cs" />
+    <Compile Include="ThreadSafeList.cs" />
     <Compile Include="TypeInfo.cs" />
     <Compile Include="TypeMap.cs" />
     <Compile Include="Internal\TypeMapFactory.cs" />
-    <Compile Include="Internal\ValueFormatter.cs" />
     <Compile Include="ValueFormatter.cs" />
     <Compile Include="ValueResolver.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="AutoMapper.snk" />
+    <EmbeddedResource Include="AutoMapper.snk" />
     <None Include="SemanticModel.cd" />
   </ItemGroup>
   <ItemGroup>

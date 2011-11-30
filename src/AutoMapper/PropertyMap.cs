@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using AutoMapper.Internal;
 
 namespace AutoMapper
@@ -19,6 +21,7 @@ namespace AutoMapper
         private bool _sealed;
         private IValueResolver[] _cachedResolvers;
         private Func<ResolutionContext, bool> _condition;
+        private MemberInfo _sourceMember;
 
         public PropertyMap(IMemberAccessor destinationProperty)
         {
@@ -26,6 +29,28 @@ namespace AutoMapper
         }
 
         public IMemberAccessor DestinationProperty { get; private set; }
+        public LambdaExpression CustomExpression { get; private set; }
+
+        public MemberInfo SourceMember
+        {
+            get
+            {
+                if (_sourceMember == null)
+                {
+                    var sourceMemberGetter = GetSourceValueResolvers()
+                        .OfType<IMemberGetter>().LastOrDefault();
+                    return sourceMemberGetter == null ? null : sourceMemberGetter.MemberInfo;
+                }
+                else
+                {
+                    return _sourceMember;
+                }
+            }
+            internal set
+            {
+                _sourceMember = value;
+            }
+        }
 
         public bool CanBeSet
         {
@@ -71,12 +96,7 @@ namespace AutoMapper
 
             var result = new ResolutionResult(context);
 
-            foreach (var resolver in _cachedResolvers)
-            {
-                result = resolver.Resolve(result);
-            }
-
-            return result;
+            return _cachedResolvers.Aggregate(result, (current, resolver) => resolver.Resolve(current));
         }
 
         internal void Seal()
@@ -208,5 +228,16 @@ namespace AutoMapper
         {
             return _condition == null || _condition(context);
         }
+
+        public void SetCustomValueResolverExpression<TSource, TMember>(Expression<Func<TSource, TMember>> sourceMember)
+        {
+            if (sourceMember.Body is MemberExpression)
+            {
+                SourceMember = ((MemberExpression) sourceMember.Body).Member;
+            }
+            CustomExpression = sourceMember;
+            AssignCustomValueResolver(new DelegateBasedResolver<TSource, TMember>(sourceMember.Compile()));
+        }
+
     }
 }

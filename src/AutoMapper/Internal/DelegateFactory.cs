@@ -1,5 +1,10 @@
 using System;
 using System.Collections;
+#if !SILVERLIGHT
+using System.Collections.Concurrent;
+#else
+using TvdP.Collections;
+#endif
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -16,11 +21,11 @@ namespace AutoMapper
 	internal delegate void LateBoundValueTypeFieldSet(ref object target, object value);
 	internal delegate void LateBoundValueTypePropertySet(ref object target, object value);
 	internal delegate object LateBoundCtor();
+    internal delegate object LateBoundParamsCtor(params object[] parameters);
 
 	internal static class DelegateFactory
 	{
-        private static readonly object _ctorCacheSync = new object();
-		private static readonly Dictionary<Type, LateBoundCtor> _ctorCache = new Dictionary<Type, LateBoundCtor>();
+        private static readonly ConcurrentDictionary<Type, LateBoundCtor> _ctorCache = new ConcurrentDictionary<Type, LateBoundCtor>();
 		
 		public static LateBoundMethod CreateGet(MethodInfo method)
 		{
@@ -131,24 +136,16 @@ namespace AutoMapper
 		}
 
 	    public static LateBoundCtor CreateCtor(Type type)
-		{
-			LateBoundCtor ctor;
-			if (!_ctorCache.TryGetValue(type, out ctor))
-			{
-                lock (_ctorCacheSync)
-				{
-                    if (_ctorCache.TryGetValue(type, out ctor))
-					{
-						return ctor;
-					}
+	    {
+	        LateBoundCtor ctor = _ctorCache.GetOrAdd(type, t =>
+	        {
+	            var ctorExpression = Expression.Lambda<LateBoundCtor>(Expression.Convert(Expression.New(type), typeof(object)));
+                
+	            return ctorExpression.Compile();
+	        });
 
-					var ctorExpression = Expression.Lambda<LateBoundCtor>(Expression.Convert(Expression.New(type), typeof(object)));
-					ctor = ctorExpression.Compile();
-					_ctorCache.Add(type, ctor);
-				}
-			}
-			return ctor;
-		}
+	        return ctor;
+	    }
 
 	    private static DynamicMethod CreateValueTypeDynamicMethod(MemberInfo member, Type sourceType)
 	    {
@@ -187,5 +184,22 @@ namespace AutoMapper
 					Expression.ArrayIndex(argumentsParameter, Expression.Constant(index)),
 					parameter.ParameterType)).ToArray();
 		}
+
+	    public static LateBoundParamsCtor CreateCtor(ConstructorInfo constructorInfo, IEnumerable<ConstructorParameterMap> ctorParams)
+	    {
+	        ParameterExpression paramsExpr = Expression.Parameter(typeof(object[]), "parameters");
+
+            var convertExprs = ctorParams
+                .Select((ctorParam, i) => Expression.Convert(
+                    Expression.ArrayIndex(paramsExpr, Expression.Constant(i)),
+                    ctorParam.Parameter.ParameterType))
+                .ToArray();
+
+            NewExpression newExpression = Expression.New(constructorInfo, convertExprs);
+
+	        var lambda = Expression.Lambda<LateBoundParamsCtor>(newExpression, paramsExpr);
+
+	        return lambda.Compile();
+	    }
 	}
 }

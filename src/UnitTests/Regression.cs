@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using NBehave.Spec.NUnit;
+using Should;
 using NUnit.Framework;
 using System.Linq;
 
@@ -109,8 +109,6 @@ namespace AutoMapper.UnitTests
 
 		public class When_mappings_are_created_on_the_fly : NonValidatingSpecBase
 		{
-			private Order _order;
-
 			public class Order
 			{
 				public string Name { get; set; }

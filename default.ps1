@@ -1,4 +1,5 @@
-$framework = '4.0'
+$framework = '4.0x86'
+$version = '2.1.0'
 
 properties {
 	$base_dir = resolve-path .
@@ -9,20 +10,24 @@ properties {
 	$test_dir = "$build_dir\test"
 	$result_dir = "$build_dir\results"
 	$lib_dir = "$base_dir\lib"
-	$buildNumber = if ($env:build_number -ne $NULL) { $env:build_number } else { '2.0.9999.0' }
-	$config = "debug"
+	$buildNumber = if ($env:build_number -ne $NULL) { $version + '.' + $env:build_number } else { $version + '.0' }
+	$global:config = "debug"
 	$framework_dir = Get-FrameworkDirectory
 }
 
 
 task default -depends local
 task local -depends compile, test
-task full -depends local, merge, dist
-task ci -depends clean, commonAssemblyInfo, local, merge, dist
+task full -depends local, dist
+task ci -depends clean, release, commonAssemblyInfo, local, dist
 
 task clean {
 	delete_directory "$build_dir"
 	delete_directory "$dist_dir"
+}
+
+task release {
+    $global:config = "release"
 }
 
 task compile -depends clean { 
@@ -34,24 +39,21 @@ task commonAssemblyInfo {
     create-commonAssemblyInfo "$buildNumber" "$commit" "$source_dir\CommonAssemblyInfo.cs"
 }
 
-task merge {
-	create_directory "$build_dir\merge"
-	exec { & $tools_dir\ILMerge\ilmerge.exe /targetplatform:"v4,$framework_dir" /log /out:"$build_dir\merge\AutoMapper.dll" /internalize:AutoMapper.exclude "$build_dir\$config\AutoMapper\AutoMapper.dll" "$build_dir\$config\AutoMapper\Castle.Core.dll" /keyfile:"$source_dir\AutoMapper.snk" }
-}
-
 task test {
 	create_directory "$build_dir\results"
     exec { & $tools_dir\nunit\nunit-console-x86.exe $build_dir/$config/UnitTests/AutoMapper.UnitTests.dll /nologo /nodots /xml=$result_dir\AutoMapper.xml }
-    exec { & $tools_dir\Machine.Specifications-net-4.0-Release\mspec.exe --teamcity $build_dir/$config/UnitTests/AutoMapper.UnitTests.dll }
+    exec { & $tools_dir\nunit\nunit-console-x86.exe $build_dir/$config/UnitTests.Silverlight/AutoMapper.UnitTests.Silverlight.dll /nologo /nodots /xml=$result_dir\AutoMapper.Silverlight.xml }
 }
 
 task dist {
 	create_directory $dist_dir
-	$exclude = @('*.pdb')
-	copy_files "$build_dir\merge" "$build_dir\dist-merged" $exclude
-	copy_files "$build_dir\$config\AutoMapper" "$build_dir\dist" $exclude
-	zip_directory "$build_dir\dist" "$dist_dir\AutoMapper-unmerged.zip"
-	copy-item "$build_dir\dist-merged\AutoMapper.dll" "$dist_dir"
+	copy_files "$build_dir\$config\AutoMapper" "$dist_dir\net40-client"
+	copy_files "$build_dir\$config\AutoMapper.Silverlight" "$dist_dir\sl4" "mscorlib.dll"
+    create-nuspec "$buildNumber"
+
+    exec { & $tools_dir\NuGet.exe pack $build_dir\AutoMapper.nuspec -Symbols }
+
+	move-item "*.nupkg" "$dist_dir"
 }
 
 # -------------------------------------------------------------------------------------------------------------
@@ -123,3 +125,31 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfigurationAttribute(""release"")]
 [assembly: AssemblyInformationalVersionAttribute(""$version"")]"  | out-file $filename -encoding "ASCII"    
 }
+
+function global:create-nuspec()
+{
+    "<?xml version=""1.0""?>
+<package xmlns=""http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd"">
+  <metadata>
+    <id>AutoMapper</id>
+    <version>$version</version>
+    <authors>Jimmy Bogard</authors>
+    <owners>Jimmy Bogard</owners>
+    <licenseUrl>http://automapper.codeplex.com/license</licenseUrl>
+    <projectUrl>http://automapper.codeplex.com</projectUrl>
+    <iconUrl>https://s3.amazonaws.com/automapper/icon.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>A convention-based object-object mapper</summary>
+    <description>A convention-based object-object mapper. AutoMapper uses a fluent configuration API to define an object-object mapping strategy. AutoMapper uses a convention-based matching algorithm to match up source to destination values. Currently, AutoMapper is geared towards model projection scenarios to flatten complex object models to DTOs and other simple objects, whose design is better suited for serialization, communication, messaging, or simply an anti-corruption layer between the domain and application layer.</description>
+  </metadata>
+  <files>
+    <file src=""$dist_dir\net40-client\AutoMapper.dll"" target=""lib\net40-client"" />
+    <file src=""$dist_dir\net40-client\AutoMapper.pdb"" target=""lib\net40-client"" />
+    <file src=""$dist_dir\net40-client\AutoMapper.xml"" target=""lib\net40-client"" />
+    <file src=""$dist_dir\sl4\AutoMapper.dll"" target=""lib\sl4"" />
+    <file src=""$dist_dir\sl4\AutoMapper.pdb"" target=""lib\sl4"" />
+    <file src=""$dist_dir\sl4\AutoMapper.xml"" target=""lib\sl4"" />
+  </files>
+</package>" | out-file $build_dir\AutoMapper.nuspec -encoding "ASCII"
+}
+

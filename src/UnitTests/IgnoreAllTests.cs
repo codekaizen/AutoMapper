@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using NUnit.Framework.SyntaxHelpers;
+using Should;
 
 namespace AutoMapper.UnitTests
 {
@@ -45,8 +45,8 @@ namespace AutoMapper.UnitTests
 			});
 
             Destination destination = Mapper.Map<Source, Destination>(new Source { ShouldBeMapped = "true" });
-            Assert.That(destination.StartingWith_ShouldBeNullAfterwards, Is.Null);
-            Assert.That(destination.StartingWith_ShouldNotBeMapped, Is.Null);
+            destination.StartingWith_ShouldBeNullAfterwards.ShouldEqual(null);
+            destination.StartingWith_ShouldNotBeMapped.ShouldEqual(null);
         }
 
         [Test]
@@ -60,8 +60,41 @@ namespace AutoMapper.UnitTests
 			});
 
             Destination destination = Mapper.Map<Source, Destination>(new Source { ShouldBeMapped = "true" });
-            Assert.That(destination.AnotherString_ShouldBeNullAfterwards, Is.Null);
-            Assert.That(destination.StartingWith_ShouldNotBeMapped, Is.Null);
+            destination.AnotherString_ShouldBeNullAfterwards.ShouldEqual(null);
+            destination.StartingWith_ShouldNotBeMapped.ShouldEqual(null);
         }
     }
+
+	[TestFixture]
+	public class IgnoreAttributeTests
+	{
+		public class Source
+		{
+			public string ShouldBeMapped { get; set; }
+			public string ShouldNotBeMapped { get; set; }
+		}
+
+		public class Destination
+		{
+			public string ShouldBeMapped { get; set; }
+			[IgnoreMap]
+			public string ShouldNotBeMapped { get; set; }
+		}
+
+		[Test]
+		public void Ignore_On_Source_Field()
+		{
+			Mapper.CreateMap<Source, Destination>();
+			Mapper.AssertConfigurationIsValid();
+
+			Source source = new Source
+			{
+				ShouldBeMapped = "Value1",
+				ShouldNotBeMapped = "Value2"
+			};
+
+			Destination destination = Mapper.Map<Source, Destination>(source);
+            destination.ShouldNotBeMapped.ShouldEqual(null);
+		}
+	}
 }

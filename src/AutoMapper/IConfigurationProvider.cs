@@ -16,6 +16,7 @@ namespace AutoMapper
 	{
 		TypeMap[] GetAllTypeMaps();
 		TypeMap FindTypeMapFor(object source, Type sourceType, Type destinationType);
+		TypeMap FindTypeMapFor(Type sourceType, Type destinationType);
 		TypeMap FindTypeMapFor(ResolutionResult resolutionResult, Type destinationType);
 		IFormatterConfiguration GetProfileConfiguration(string profileName);
 		void AssertConfigurationIsValid();
@@ -25,6 +26,7 @@ namespace AutoMapper
 		TypeMap CreateTypeMap(Type sourceType, Type destinationType);
 
 		event EventHandler<TypeMapCreatedEventArgs> TypeMapCreated;
+	    Func<Type, object> ServiceCtor { get; }
 	}
 
 }

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using NBehave.Spec.NUnit;
+using Should;
 using NUnit.Framework;
 using System.Linq;
 
@@ -186,7 +186,7 @@ namespace AutoMapper.UnitTests
 			public void Should_throw_a_mapping_exception()
 			{
 				var model = new ModelObject();
-				model.NullableDate = new DateTime(2007, 8, 4).ToString();
+				model.NullableDate = "Lorem Ipsum";
 				
 				typeof(AutoMapperMappingException).ShouldBeThrownBy(() => Mapper.Map<ModelObject, ModelDto>(model));
 			}
