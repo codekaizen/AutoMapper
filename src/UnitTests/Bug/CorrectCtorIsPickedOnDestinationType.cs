@@ -7,20 +7,11 @@ namespace AutoMapper.UnitTests.Bug
     [TestFixture]
     public class CorrectCtorIsPickedOnDestinationType : AutoMapperSpecBase
     {
-        public enum SomeEnum
-        {
-            First,
-            Second,
-            Third
-        }
-
         public class SourceClass { }
 
         public class DestinationClass
         {
-            public DestinationClass()
-            {
-            }
+            public DestinationClass() { }
 
             public DestinationClass(Int32 type)
             {
