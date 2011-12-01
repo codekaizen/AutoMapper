@@ -13,6 +13,8 @@ namespace AutoMapper.UnitTests.Bug
         {
             public DestinationClass() { }
 
+            // Since the name of the parameter is 'type', Automapper.TypeMapFactory chooses SourceClass.GetType()
+            // to fulfill the dependency, causing an InvalidCastException during Mapper.Map()
             public DestinationClass(Int32 type)
             {
                 Type = type;
@@ -21,6 +23,7 @@ namespace AutoMapper.UnitTests.Bug
             public Int32 Type { get; private set; }
         }
 
+        // https://github.com/AutoMapper/AutoMapper/issues/154 
         [Test]
         public void Should_pick_a_ctor_which_best_matches()
         {
