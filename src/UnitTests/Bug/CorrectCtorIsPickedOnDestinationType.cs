@@ -15,10 +15,10 @@ namespace AutoMapper.UnitTests.Bug
 
             public DestinationClass(Int32 type)
             {
-                TestType = type;
+                Type = type;
             }
 
-            public Int32 TestType { get; private set; }
+            public Int32 Type { get; private set; }
         }
 
         [Test]
@@ -28,7 +28,7 @@ namespace AutoMapper.UnitTests.Bug
 
             var source = new SourceClass();
 
-            object dest = Mapper.Map<DestinationClass>(source);
+            Mapper.Map<DestinationClass>(source);
         }
     }
 }
